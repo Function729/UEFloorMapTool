@@ -18,9 +18,12 @@ public:
 private slots:
     void OnOpenButtonClicked();
     void OnSaveButtonClicked();
+    void OnShowTableMenuCalled(const QPoint& pos);
 private:
     Ui::MainWindow *ui;
     QStringList parseCSVLine(QString inLine);
     QString filePath;
+    QMenu* oneBlockRightMenu;
+    QVector<class QTableWidgetItem*> TableItem;
 };
 #endif // MAINWINDOW_H

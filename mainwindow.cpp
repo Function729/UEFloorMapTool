@@ -14,9 +14,22 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+
+    oneBlockRightMenu = new QMenu(this);
+
+
     ui->setupUi(this);
     connect(ui->OpenButton,&QPushButton::clicked,this,&MainWindow::OnOpenButtonClicked);
     connect(ui->SaveButton,&QPushButton::clicked,this,&MainWindow::OnSaveButtonClicked);
+
+//修改表格点击逻辑
+    ui->TableWidget->setEditTriggers(QAbstractItemView::DoubleClicked);
+    //设置表格右键菜单
+   ui->TableWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+   connect( ui->TableWidget,
+        &QTableWidget::customContextMenuRequested,
+        this,
+        &MainWindow::OnShowTableMenuCalled);
 }
 
 MainWindow::~MainWindow()
@@ -51,8 +64,18 @@ void MainWindow::OnOpenButtonClicked()
     {
         QString headerLine = in.readLine();
         QStringList headers = parseCSVLine(headerLine);
-        ui->TableWidget->setColumnCount(headers.size());
-        ui->TableWidget->setHorizontalHeaderLabels(headers);
+        if(headers[0]!=QString("---"))
+        {
+         ui->TableWidget->setColumnCount(headers.size());
+         QStringList list = {"---","---","---"};
+         ui->TableWidget->setHorizontalHeaderLabels(list);
+        }else
+        {
+             ui->TableWidget->setColumnCount(headers.size());
+          ui->TableWidget->setHorizontalHeaderLabels(headers);
+        }
+
+
     }
     int row = 0;
     while (!in.atEnd())
@@ -139,6 +162,75 @@ void MainWindow::OnSaveButtonClicked()
     file.close();
     statusBar()->showMessage("保存成功", 3000);
 }
+
+void MainWindow::OnShowTableMenuCalled(const QPoint& pos)
+{
+      oneBlockRightMenu->clear();
+     //判断是否处于表格点击
+     QModelIndex index = ui->TableWidget->indexAt(pos);
+     if (index.isValid())
+     {
+
+         oneBlockRightMenu->addAction(index.data().toString());
+         oneBlockRightMenu->addSeparator();
+         QAction* SelectSimilarFront = oneBlockRightMenu->addAction("选择相似楼栋");
+         QAction* SelectSimilarBack = oneBlockRightMenu->addAction("选择相似楼层");
+
+
+
+         QAction* chosen = oneBlockRightMenu->exec(ui->TableWidget->viewport()->mapToGlobal(pos));
+
+
+         //只要有右键事件，就清空选中的
+         for (auto item:TableItem)
+         {
+            item->setBackground(QBrush());
+         }
+         TableItem.clear();
+
+         if(chosen==SelectSimilarBack)
+         {
+
+            QTableWidgetItem* item =  ui->TableWidget->item(index.row(),index.column());
+            QStringList sampleSplitedResult = item->text().split(QString("_"));
+            if(sampleSplitedResult[1]!=""){
+                for (int i=0;i<=ui->TableWidget->rowCount()-1;++i) {
+                   QTableWidgetItem* SelectedItem = ui->TableWidget->item(i,index.column());
+                   QStringList splite = SelectedItem->text().split(QString("_"));
+                   if(sampleSplitedResult[1]==splite[1])
+                   {
+                     SelectedItem->setBackground(QBrush(Qt::yellow));
+                     TableItem.push_back(SelectedItem);
+                   }
+                }
+            }
+         }
+         else if(chosen==SelectSimilarFront)
+         {
+
+         }
+         else {
+
+         }
+     }
+     else
+     {
+
+         QAction* sort = oneBlockRightMenu->addAction("排序");
+         oneBlockRightMenu->addSeparator();
+           QAction* chosen = oneBlockRightMenu->exec(ui->TableWidget->viewport()->mapToGlobal(pos));
+           if(chosen == sort)
+           {
+
+           }
+     }
+
+
+
+
+}
+
+
 
 QStringList MainWindow::parseCSVLine(QString inLine)
 {
