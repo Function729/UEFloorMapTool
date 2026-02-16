@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QFile>
 #include <QFileDialog>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSaveFile>
@@ -21,6 +22,15 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     connect(ui->OpenButton,&QPushButton::clicked,this,&MainWindow::OnOpenButtonClicked);
     connect(ui->SaveButton,&QPushButton::clicked,this,&MainWindow::OnSaveButtonClicked);
+
+    //使用自己继承来的委托类，因为QSytledItemDelagate中的createEditor没有发送消息所以还要自己实现一下
+    //createeditor似乎只做了让工厂生成editline的事情，在双击编辑格子内容的时候，会调用createEdit，然后出现一个editline，同时返回的应该是editline
+    //所以重载了createEditor，写了一个连接了editLine的textChange,让这个自定义的DelagateWithCreateEditor也能够拿到本不对外可见editLine的TextChange的消息
+    DelagateWithCreateEditor* EditorDelagete = new DelagateWithCreateEditor(ui->TableWidget);
+    ui->TableWidget->setItemDelegate(EditorDelagete);
+    connect(EditorDelagete,&DelagateWithCreateEditor::textEdited,this,[=](const QString& text){
+        OnTextChanged(text,1,1);
+    });
 
 //修改表格点击逻辑
     ui->TableWidget->setEditTriggers(QAbstractItemView::DoubleClicked);
@@ -168,6 +178,14 @@ void MainWindow::OnShowTableMenuCalled(const QPoint& pos)
       oneBlockRightMenu->clear();
      //判断是否处于表格点击
      QModelIndex index = ui->TableWidget->indexAt(pos);
+        //只要有右键事件，就清空选中的
+         for (auto item:TableItem)
+         {
+            item->setBackground(QBrush());
+         }
+         TableItem.clear();
+         SelectMode = ESelectMode::None;
+
      if (index.isValid())
      {
 
@@ -181,16 +199,10 @@ void MainWindow::OnShowTableMenuCalled(const QPoint& pos)
          QAction* chosen = oneBlockRightMenu->exec(ui->TableWidget->viewport()->mapToGlobal(pos));
 
 
-         //只要有右键事件，就清空选中的
-         for (auto item:TableItem)
-         {
-            item->setBackground(QBrush());
-         }
-         TableItem.clear();
 
          if(chosen==SelectSimilarBack)
          {
-
+            SelectMode = ESelectMode::ESM_FloorMode;
             QTableWidgetItem* item =  ui->TableWidget->item(index.row(),index.column());
             QStringList sampleSplitedResult = item->text().split(QString("_"));
             if(sampleSplitedResult[1]!=""){
@@ -230,6 +242,26 @@ void MainWindow::OnShowTableMenuCalled(const QPoint& pos)
 
 }
 
+void MainWindow::OnTextChanged(const QString& text,int row,int col)
+{
+  static bool firstTime = true;
+
+  switch (SelectMode) {
+
+    case ESelectMode::ESM_FloorMode:
+        for (auto i : TableItem) {
+                QString front = i->text().split("_")[0];
+                QString back = text.split("_")[1];
+                i->setText(front.append("_").append(back));
+          }
+    break;
+  }
+
+
+
+
+}
+
 
 
 QStringList MainWindow::parseCSVLine(QString inLine)
@@ -259,4 +291,14 @@ QStringList MainWindow::parseCSVLine(QString inLine)
         return fields;
     }
     return QStringList();
+}
+
+QWidget *DelagateWithCreateEditor::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+
+            QLineEdit* line = new QLineEdit(parent);
+
+            connect(line,&QLineEdit::textEdited,this,&DelagateWithCreateEditor::textEdited);
+            return line;
+
 }
